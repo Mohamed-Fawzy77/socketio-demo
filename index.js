@@ -1,32 +1,41 @@
 import httpServer, { app } from "./src/http-server.js";
 import express from "express";
+import { sendRealTimeMessage } from "./src/socket-io.gateway.js";
+import { validateTokenAndGetUserIdFromToken } from "./src/auth.js";
 import {
-  sendNewGoldPrice,
-  sendNewSilverPrice,
-  sendMessageToRoom,
-} from "./src/socket-io.gateway.js";
+  addMessageToChat,
+  getUserChats,
+  validateUserAccessToChat,
+} from "./src/chats.js";
 
 app.use(express.json());
 
-app.post("/gold", (req, res) => {
-  const price = req.body.price;
+app.get("/chats", (req, res) => {
+  const token = req.headers.token;
 
-  sendNewGoldPrice(price);
-  res.send("new gold price sent");
+  const id = validateTokenAndGetUserIdFromToken(token);
+
+  const userChats = getUserChats(id);
+
+  res.send(userChats);
 });
 
-app.post("/silver", (req, res) => {
-  const price = req.body.price;
+app.post("/message", (req, res) => {
+  const token = req.headers.token;
 
-  sendNewSilverPrice(price);
-  res.send("new silver price sent");
-});
+  const userId = validateTokenAndGetUserIdFromToken(token);
 
-app.post("/send-message-to-room", (req, res) => {
-  const { message, room } = req.body;
+  const { message, chatId } = req.body;
+  validateUserAccessToChat({ userId, chatId });
 
-  sendMessageToRoom(message, room);
-  res.send("message sent to room");
+  const createdMessage = addMessageToChat({
+    message,
+    chatId,
+    userId,
+  });
+
+  sendRealTimeMessage(chatId, createdMessage);
+  res.send(createdMessage);
 });
 
 const PORT = process.env.PORT || 3000;
